@@ -1,9 +1,10 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import Plate from './Plate';
 import { CLOSED_STATUSES, METHODS, STATUSES } from '@/lib/shared/constants';
-import { addMonths, jpDate } from '@/lib/shared/dates';
+import { addMonths, jpDate, shortDate } from '@/lib/shared/dates';
 import { daysLeft, guidanceMessage, hm, modelYear, severity } from '@/lib/shared/view';
 
 function fmtLogTime(iso) {
@@ -103,7 +104,7 @@ export default function Detail({ item, today, onClose, onChanged, onConflict, on
         <div className="dh">
           <div>
             <h2 id="detail-title">{item.customer_name ? `${item.customer_name} 様` : '保有者未設定'}</h2>
-            <div className="sub">{[item.customer_kana, item.koky_no, item.sales_staff && `担当 ${item.sales_staff}`].filter(Boolean).join(' ・ ')}</div>
+            <div className="sub">{[item.customer_kana, item.koky_no, item.sales_staff && `営業 ${item.sales_staff}`, item.service_staff && `作業 ${item.service_staff}`].filter(Boolean).join(' ・ ')}</div>
           </div>
           <button ref={closeRef} type="button" className="close" onClick={onClose} aria-label="閉じる">×</button>
         </div>
@@ -175,6 +176,21 @@ export default function Detail({ item, today, onClose, onChanged, onConflict, on
               </div>
             )}
             {item.updated_by_name && <div className="xs muted">最終更新：{item.updated_by_name}</div>}
+          </section>
+
+          <section className="sec">
+            <h3>入庫予約</h3>
+            {item.booking ? (
+              <div className="row">
+                <span><b>{shortDate(item.booking.planned_date)}{item.booking.planned_time ? ` ${item.booking.planned_time}` : ''}</b> に入庫予定{item.booking.work_staff ? `（作業 ${item.booking.work_staff}）` : ''}</span>
+                <Link className="btn small" href={`/nyuko?booking=${item.booking.id}`}>入庫管理で開く</Link>
+              </div>
+            ) : (
+              <div className="row">
+                <Link className="btn primary" href={`/nyuko?from=yuhatsu&car=${item.car_no}&shkn=${item.shkn_day}`}>入庫予約を入れる</Link>
+                <span className="xs muted">予約を入れると「予約済み」になり、入庫したら自動で「入庫済み」になります</span>
+              </div>
+            )}
           </section>
 
           <section className="sec">

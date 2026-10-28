@@ -24,6 +24,21 @@ function fmtDateTime(iso) {
   return d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+const uniqueSorted = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
+
+/** この端末で選んだ絞り込みを覚えておく（使えない環境ではただの state） */
+function useRemembered(key, initial) {
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    try { const v = window.localStorage.getItem(key); if (v !== null) setValue(v); } catch { /* 使えない */ }
+  }, [key]);
+  const set = useCallback((v) => {
+    setValue(v);
+    try { window.localStorage.setItem(key, v); } catch { /* 使えない */ }
+  }, [key]);
+  return [value, set];
+}
+
 export default function Board() {
   const { signOut } = useSession();
   const [data, setData] = useState(null);
@@ -31,7 +46,8 @@ export default function Board() {
   const [tile, setTile] = useState('todo');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
-  const [staff, setStaff] = useState('');
+  const [salesStaff, setSalesStaff] = useRemembered('yuhatsu.sales', '');
+  const [workStaff, setWorkStaff] = useRemembered('yuhatsu.work', '');
   const [openNo, setOpenNo] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState('');
@@ -70,10 +86,8 @@ export default function Board() {
     return c;
   }, [items, today]);
 
-  const staffNames = useMemo(
-    () => [...new Set(items.map((i) => i.sales_staff).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja')),
-    [items],
-  );
+  const salesNames = useMemo(() => uniqueSorted(items.map((i) => i.sales_staff)), [items]);
+  const workNames = useMemo(() => uniqueSorted(items.map((i) => i.service_staff)), [items]);
 
   const rows = useMemo(() => {
     const kw = query.trim().toLowerCase().replace(/\s+/g, '');
@@ -83,7 +97,8 @@ export default function Board() {
         if (tile === 'todo' && !needsAction(it, today)) return false;
         if (!['todo', 'all'].includes(tile) && bucket(d) !== tile) return false;
         if (status && it.status !== status) return false;
-        if (staff && it.sales_staff !== staff) return false;
+        if (salesStaff && it.sales_staff !== salesStaff) return false;
+        if (workStaff && it.service_staff !== workStaff) return false;
         if (kw) {
           const hay = [it.customer_name, it.customer_kana, it.maker, it.car_name, it.grade, it.plate_area, it.plate_class, it.plate_kana, it.plate_number, it.tel, it.mobile]
             .join('').toLowerCase().replace(/\s+/g, '');
@@ -92,7 +107,7 @@ export default function Board() {
         return true;
       })
       .sort((a, b) => a.shkn_day.localeCompare(b.shkn_day) || a.car_no.localeCompare(b.car_no));
-  }, [items, today, tile, status, staff, query]);
+  }, [items, today, tile, status, salesStaff, workStaff, query]);
 
   const openItem = items.find((i) => i.car_no === openNo) || null;
 
@@ -157,9 +172,13 @@ export default function Board() {
           <option value="">すべてのステータス</option>
           {STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
-        <select className="select" aria-label="担当者で絞り込み" value={staff} onChange={(e) => setStaff(e.target.value)}>
-          <option value="">全担当者</option>
-          {staffNames.map((n) => <option key={n}>{n}</option>)}
+        <select className="select" aria-label="営業担当で絞り込み" value={salesStaff} onChange={(e) => setSalesStaff(e.target.value)}>
+          <option value="">営業担当：全員</option>
+          {salesNames.map((n) => <option key={n} value={n}>営業：{n}</option>)}
+        </select>
+        <select className="select" aria-label="作業担当で絞り込み" value={workStaff} onChange={(e) => setWorkStaff(e.target.value)}>
+          <option value="">作業担当：全員</option>
+          {workNames.map((n) => <option key={n} value={n}>作業：{n}</option>)}
         </select>
         <span className="count">{rows.length}件を表示</span>
       </div>
@@ -186,11 +205,13 @@ export default function Board() {
                   <span className={`chip ${it.prefer_tel ? 'on' : ''}`}>電話</span>
                   <span className={`chip ${it.prefer_mail ? 'on' : ''}`}>メール</span>
                   {it.dm_kbn === '2' && <span className="chip">DM不要</span>}
-                  {it.sales_staff && <span className="chip">担当 {it.sales_staff}</span>}
+                  {it.sales_staff && <span className="chip">営業 {it.sales_staff}</span>}
+                  {it.service_staff && <span className="chip">作業 {it.service_staff}</span>}
                 </div>
               </span>
               <span className="stat">
                 <span className={`pill ${it.status}`}>{STATUS_LABEL[it.status]}</span>
+                {it.booking && <span className="sub">入庫予定 {shortDate(it.booking.planned_date)}{it.booking.planned_time ? ` ${it.booking.planned_time}` : ''}</span>}
                 {isDue(it, today) && <span className="due">再連絡予定 {shortDate(it.next_contact_on)}</span>}
                 {!isDue(it, today) && it.next_contact_on && !isClosed(it) && <span className="sub">次回 {shortDate(it.next_contact_on)}</span>}
                 {it.last_contact && <span className="sub">最終 {shortDate(new Date(new Date(it.last_contact.at).getTime() + 9 * 3600_000).toISOString())} {it.last_contact.method}</span>}
