@@ -67,6 +67,7 @@ export default function NyukoBoard() {
   const [query, setQuery] = useState('');
   const [panel, setPanel] = useState(null); // {mode:'new', prefill} | {mode:'edit', id} | {mode:'walkin', seibiNo}
   const [syncing, setSyncing] = useState(false);
+  const [busyId, setBusyId] = useState(null);
   const [toast, setToast] = useState('');
 
   const showToast = useCallback((msg) => {
@@ -127,7 +128,7 @@ export default function NyukoBoard() {
         .sort((a, b) => (a.deliveryDue || '9999').localeCompare(b.deliveryDue || '9999')),
       overdue: filtered.filter((e) => e.overdue && (e.kind === 'walkin' || booked(e)))
         .sort((a, b) => (a.deliveryDue || '').localeCompare(b.deliveryDue || '')),
-      attention: filtered.filter((e) => booked(e) && (e.p.key === 'missing' || (!e.booking.car_no && e.date <= today)))
+      attention: filtered.filter((e) => booked(e) && (e.p.key === 'missing' || (!e.booking.car_no && !e.booking.arrived_at && e.date <= today)))
         .sort((a, b) => a.date.localeCompare(b.date)),
     };
   }, [filtered, today]);
@@ -139,6 +140,20 @@ export default function NyukoBoard() {
   }, [data, workType, query]);
 
   const workNames = useMemo(() => [...new Set([...(data?.staffNames?.work || []), ...entries.map((e) => e.workStaff)].filter(Boolean))], [data, entries]);
+
+  /** 一覧の「入庫済み」ボタン → 作業待ち */
+  async function arrive(e) {
+    setBusyId(e.key);
+    try {
+      await api(`/api/nyuko/bookings/${e.booking.id}/arrive`, { method: 'POST', body: { arrived: true, version: e.booking.version } });
+      showToast(`${e.customer || e.plate || '予約'}を入庫済みにしました（作業待ち）`);
+    } catch (err) {
+      onApiError(err);
+    } finally {
+      setBusyId(null);
+      load();
+    }
+  }
 
   async function syncNow() {
     setSyncing(true);
@@ -260,7 +275,7 @@ export default function NyukoBoard() {
                     <span className="cnt">{dayCount}台</span>
                   </div>
                 )}
-                <Entry e={e} today={today} showDate={tile !== 'schedule'} onOpen={() => setPanel(e.kind === 'booking' ? { mode: 'edit', id: e.booking.id } : { mode: 'walkin', seibiNo: e.seibi.seibi_no })} />
+                <Entry e={e} today={today} showDate={tile !== 'schedule'} onArrive={arrive} busy={busyId === e.key} onOpen={() => setPanel(e.kind === 'booking' ? { mode: 'edit', id: e.booking.id } : { mode: 'walkin', seibiNo: e.seibi.seibi_no })} />
               </Fragment>
             );
           })}
@@ -283,10 +298,18 @@ export default function NyukoBoard() {
   );
 }
 
-function Entry({ e, today, showDate, onOpen }) {
+function Entry({ e, today, showDate, onOpen, onArrive, busy }) {
   const dim = e.kind === 'booking' && e.booking.state !== 'booked';
+  const canArrive = e.kind === 'booking' && e.booking.state === 'booked' && ['planned', 'today', 'missing'].includes(e.p.key) && e.date <= addDays(today, 1);
   return (
-    <button type="button" className={`entry ${dim ? 'dim' : ''}`} onClick={onOpen}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`entry ${dim ? 'dim' : ''}`}
+      onClick={onOpen}
+      onKeyDown={(ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); onOpen(); } }}
+      style={{ cursor: 'pointer' }}
+    >
       <span className="when">
         {e.time || '—'}
         {showDate && e.date && <span className="d">{e.date === today ? '今日' : `${shortDate(e.date)}（${dow(e.date)}）`}</span>}
@@ -315,7 +338,11 @@ function Entry({ e, today, showDate, onOpen }) {
         {e.deliveryDue && !['delivered', 'cancelled', 'no_show'].includes(e.p.key) && (
           <span className={e.overdue ? 'due' : 'sub'}>納車予定 {shortDate(e.deliveryDue)}{e.overdue ? '（超過）' : ''}</span>
         )}
+        {canArrive && (
+          <button type="button" className="btn small primary" disabled={busy}
+            onClick={(ev) => { ev.stopPropagation(); onArrive(e); }}>{busy ? '記録中…' : '入庫済み'}</button>
+        )}
       </span>
-    </button>
+    </div>
   );
 }

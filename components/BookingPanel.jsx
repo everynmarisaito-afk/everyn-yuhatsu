@@ -11,6 +11,7 @@ const EMPTY = {
   store: '大阪店', planned_date: '', planned_time: '', return_planned_date: '', loaner: false, sales_staff: '', work_staff: '', memo: '',
 };
 const EDITABLE = Object.keys(EMPTY);
+const fmtTime = (iso) => new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const hm = (v) => (/^\d{4}$/.test(v || '') ? `${v.slice(0, 2)}:${v.slice(2)}` : v || '');
 
 function useEscape(onClose) {
@@ -131,6 +132,18 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
     }
   }
 
+  async function arrive(arrived) {
+    setBusy(true);
+    try {
+      await api(`/api/nyuko/bookings/${booking.id}/arrive`, { method: 'POST', body: { arrived, version: booking.version } });
+      onSaved(arrived ? '入庫済みにしました（作業待ち）' : '入庫済みを取り消しました', { mode: 'edit', id: booking.id });
+    } catch (e) {
+      onApiError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function link(action, seibiNo) {
     setBusy(true);
     try {
@@ -161,6 +174,19 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
               ・登録 {booking.created_by_name}{booking.updated_by_name && booking.updated_by_name !== booking.created_by_name ? `・最終更新 ${booking.updated_by_name}` : ''}
             </span>
           </div>
+          {!booking.seibi && booking.state === 'booked' && (
+            booking.arrived_at ? (
+              <div className="row">
+                <span className="small">入庫済み：{fmtTime(booking.arrived_at)}（{booking.arrived_by_name}）</span>
+                <button type="button" className="btn small" disabled={busy} onClick={() => arrive(false)}>取り消す</button>
+              </div>
+            ) : (
+              <div className="row">
+                <button type="button" className="btn primary" disabled={busy} onClick={() => arrive(true)}>入庫済み</button>
+                <span className="xs muted">押すと「作業待ち」になります。ジョーカーの伝票が取り込まれたら、そちらの日付で進みます。</span>
+              </div>
+            )
+          )}
           {booking.seibi ? (
             <SlipCard seibi={booking.seibi}>
               <button type="button" className="btn small" disabled={busy} onClick={() => link('unlink')}>結び付けを外す</button>
