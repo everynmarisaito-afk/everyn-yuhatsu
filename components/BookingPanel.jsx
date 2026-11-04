@@ -269,12 +269,10 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
             <label className="check" htmlFor="f-loaner"><input id="f-loaner" type="checkbox" checked={form.loaner} onChange={set('loaner')} /> 代車が必要</label>
           </Field>
           <Field label="作業担当" id="f-work">
-            <input id="f-work" className="input" list="work-names" value={form.work_staff} onChange={set('work_staff')} maxLength={50} />
-            <datalist id="work-names">{workNames.map((n) => <option key={n} value={n} />)}</datalist>
+            <StaffSelect id="f-work" names={workNames} value={form.work_staff} onChange={set('work_staff')} />
           </Field>
           <Field label="営業担当" id="f-sales">
-            <input id="f-sales" className="input" list="sales-names" value={form.sales_staff} onChange={set('sales_staff')} maxLength={50} />
-            <datalist id="sales-names">{salesNames.map((n) => <option key={n} value={n} />)}</datalist>
+            <StaffSelect id="f-sales" names={salesNames} value={form.sales_staff} onChange={set('sales_staff')} />
           </Field>
           <Field label="作業内容・ご依頼" id="f-detail" full>
             <textarea id="f-detail" className="textarea" value={form.work_detail} onChange={set('work_detail')} maxLength={1000} placeholder="例：エンジン警告灯点灯、異音の確認" />
@@ -289,6 +287,17 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
         </div>
       </section>
     </>
+  );
+}
+
+/** 担当の選択。候補はジョーカーに入っている名前（表記をそろえるため手入力はしない） */
+function StaffSelect({ id, names, value, onChange }) {
+  const options = value && !names.includes(value) ? [value, ...names] : names;
+  return (
+    <select id={id} className="select" value={value} onChange={onChange}>
+      <option value="">未定</option>
+      {options.map((n) => <option key={n} value={n}>{n}</option>)}
+    </select>
   );
 }
 
