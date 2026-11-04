@@ -23,6 +23,9 @@ test('進み具合', () => {
   assert.equal(progress(b(T), { nko_day: T, sgy_st_day: T }, T).key, 'working');
   assert.equal(progress(b(T), { nko_day: T, sgy_ed_day: T }, T).key, 'finished');
   assert.equal(progress(b(T), { nsh_day: T }, T).key, 'delivered');
+  // 売上決定（納車日なし）は完了扱い
+  assert.equal(progress(b(T), { nko_day: T, gm_status: '1' }, T).label, '売上確定');
+  assert.equal(isDeliveryOverdue(null, { nsh_y_day: '2026-10-01', gm_status: '1' }, T), false);
   assert.equal(progress(null, { nko_day: T }, T).key, 'arrived');
   // アプリの「入庫済み」ボタン → 作業待ち（伝票が来たら伝票の日付が優先）
   assert.equal(progress({ ...b('2026-10-26'), arrived_at: '2026-10-28T01:00:00Z' }, null, T).label, '作業待ち');
