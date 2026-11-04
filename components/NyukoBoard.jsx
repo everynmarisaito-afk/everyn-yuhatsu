@@ -17,6 +17,7 @@ const TILES = [
   { id: 'inshop', label: '入庫中', dot: 'warn' },
   { id: 'overdue', label: '納車予定超過', dot: 'late' },
   { id: 'attention', label: '要確認', dot: 'late' },
+  { id: 'undecided', label: '入庫未定（見積のみ）', dot: 'muted' },
   { id: 'member', label: '会員アプリ予約', dot: 'good' },
 ];
 
@@ -126,10 +127,13 @@ export default function NyukoBoard() {
         .sort((a, b) => (a.time || '99').localeCompare(b.time || '99')),
       inshop: filtered.filter((e) => isInShop(e.p) && (e.kind === 'walkin' || booked(e)))
         .sort((a, b) => (a.deliveryDue || '9999').localeCompare(b.deliveryDue || '9999')),
-      overdue: filtered.filter((e) => e.overdue && (e.kind === 'walkin' || booked(e)))
+      overdue: filtered.filter((e) => e.overdue && e.p.key !== 'undecided' && (e.kind === 'walkin' || booked(e)))
         .sort((a, b) => (a.deliveryDue || '').localeCompare(b.deliveryDue || '')),
       attention: filtered.filter((e) => booked(e) && (e.p.key === 'missing' || (!e.booking.car_no && !e.booking.arrived_at && e.date <= today)))
         .sort((a, b) => a.date.localeCompare(b.date)),
+      // 見積だけ送って入庫していない：古い見積から順に（追いかけ連絡用）
+      undecided: filtered.filter((e) => e.p.key === 'undecided' && (e.kind === 'walkin' || booked(e)))
+        .sort((a, b) => (a.date || '').localeCompare(b.date || '')),
     };
   }, [filtered, today]);
 
@@ -218,7 +222,7 @@ export default function NyukoBoard() {
       )}
       {run && run.ok === false && <div className="notice fail" role="alert">前回の取り込みに失敗しました：{run.error}</div>}
 
-      <div className="summary">
+      <div className="summary seven">
         {TILES.map((t) => (
           <button key={t.id} type="button" className="tile" aria-pressed={tile === t.id} onClick={() => setTile(t.id)}>
             <span className="lbl"><span className={`dot ${t.dot}`} />{t.label}</span>
@@ -343,7 +347,7 @@ function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
         <span className={`wt ${e.workType}`}>{e.workType}</span>
         <div className="flags">
           {e.loaner && <span className="flag loaner">代車</span>}
-          {e.hold && <span className="flag hold">{e.hold}</span>}
+          {e.hold && e.p.key !== 'undecided' && <span className="flag hold">{e.hold}</span>}
           {e.kind === 'walkin' && <span className="flag walkin">予約なし入庫</span>}
           {e.kind === 'booking' && e.booking.source === 'yuhatsu' && <span className="flag walkin">誘発から</span>}
           {e.kind === 'booking' && e.booking.source === 'member_app' && <span className="flag walkin">会員アプリ</span>}

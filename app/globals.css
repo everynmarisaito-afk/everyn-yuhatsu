@@ -257,3 +257,7 @@ a.btn { text-decoration: none; display: inline-block; }
   .form-grid { grid-template-columns: 1fr; }
 }
 .prog.inspected { background: #e6eefb; color: #1f4f9a; }
+.prog.undecided { background: var(--soft); color: var(--muted); border: 1px dashed var(--line-strong); }
+.summary.seven { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .summary.seven { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .summary.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canHold, canKensa, isDeliveryOverdue, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
+import { canHold, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
 import { mapJocarSeibi, mapVehicleHit } from '../lib/server/jocar-map.js';
 import { sampleNyuko } from '../lib/server/sample.js';
 
@@ -110,4 +110,16 @@ test('部品待ち・保留と検査ライン済み', () => {
   assert.equal(progress(null, slip, T2, { kensa_at: 'x' }).label, '検査ライン済み');
   assert.equal(progress({ planned_date: T2, state: 'booked', arrived_at: 'x', kensa_at: 'y' }, null, T2).key, 'inspected');
   assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { kensa_at: 'x' }).label, '売上確定');
+});
+
+test('入庫未定（見積のみ）', () => {
+  const T2 = '2026-11-04';
+  const slip = { uke_day: '2026-10-20', gm_status: '0', nsh_y_day: '2026-10-25' };
+  const p = progress(null, slip, T2, { hold_reason: '入庫未定' });
+  assert.equal(p.key, 'undecided');
+  assert.equal(isInShop(p), false);
+  assert.equal(canHold(slip, p), true); // 入庫したら「なし」に戻せる
+  assert.equal(canKensa('車検', p), false);
+  // 売上決定になれば売上確定が優先
+  assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { hold_reason: '入庫未定' }).key, 'delivered');
 });
