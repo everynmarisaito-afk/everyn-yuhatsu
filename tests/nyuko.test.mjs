@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isDeliveryOverdue, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
+import { canHold, canKensa, isDeliveryOverdue, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
 import { mapJocarSeibi, mapVehicleHit } from '../lib/server/jocar-map.js';
 import { sampleNyuko } from '../lib/server/sample.js';
 
@@ -94,4 +94,20 @@ test('入庫サンプルがDBの制約に合う', () => {
   // サンプルの予約2件（Cクラス）がサンプル伝票に自動で結び付く
   const c = bookings.find((b) => b.car_no === 'SM00000004');
   assert.equal(pickSeibiFor(c, seibi)?.seibi_no, 'SS00000001');
+});
+
+test('部品待ち・保留と検査ライン済み', () => {
+  const T2 = '2026-11-04';
+  const slip = { nko_day: T2, gm_status: '0' };
+  // 見積（伝票）がなければ部品待ち・保留は選べない
+  assert.equal(canHold(null, progress({ planned_date: T2, state: 'booked', arrived_at: 'x' }, null, T2)), false);
+  assert.equal(canHold(slip, progress(null, slip, T2)), true);
+  assert.equal(canHold({ ...slip, gm_status: '1' }, progress(null, { ...slip, gm_status: '1' }, T2)), false);
+  // 車検で入庫中なら検査ライン済みを押せる。押すと「検査ライン済み」、売上決定が優先
+  assert.equal(canKensa('車検', progress(null, slip, T2)), true);
+  assert.equal(canKensa('一般整備', progress(null, slip, T2)), false);
+  assert.equal(canKensa('車検', progress({ planned_date: '2026-11-10', state: 'booked' }, null, T2)), false);
+  assert.equal(progress(null, slip, T2, { kensa_at: 'x' }).label, '検査ライン済み');
+  assert.equal(progress({ planned_date: T2, state: 'booked', arrived_at: 'x', kensa_at: 'y' }, null, T2).key, 'inspected');
+  assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { kensa_at: 'x' }).label, '売上確定');
 });

@@ -5,7 +5,7 @@ import { useSession } from './AppShell';
 import BookingPanel from './BookingPanel';
 import { STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { addDays, jpDate, shortDate } from '@/lib/shared/dates';
-import { isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
+import { canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 const dow = (iso) => WEEK[new Date(`${iso}T00:00:00Z`).getUTCDay()];
@@ -43,13 +43,13 @@ function toEntries(data) {
     };
   });
   const walkIns = data.walkIns.map((s) => {
-    const p = progress(null, s, today);
+    const p = progress(null, s, today, s.flags);
     return {
       key: `s:${s.seibi_no}`, kind: 'walkin', booking: null, seibi: s, p,
       date: seibiArrival(s), time: hm(s.nko_y_time),
       plate: s.plate, maker: s.maker, car: s.car_name, customer: s.customer_name,
       workType: normalizeWorkType(s.work_type), detail: s.work_sub, store: '', loaner: Boolean(s.loaner_out_day),
-      workStaff: s.work_staff, salesStaff: s.sales_staff, deliveryDue: s.nsh_y_day, hold: '',
+      workStaff: s.work_staff, salesStaff: s.sales_staff, deliveryDue: s.nsh_y_day, hold: s.flags?.hold_reason || '',
       overdue: isDeliveryOverdue(null, s, today),
     };
   });
@@ -147,6 +147,23 @@ export default function NyukoBoard() {
     try {
       await api(`/api/nyuko/bookings/${e.booking.id}/arrive`, { method: 'POST', body: { arrived: true, version: e.booking.version } });
       showToast(`${e.customer || e.plate || '予約'}を入庫済みにしました（作業待ち）`);
+    } catch (err) {
+      onApiError(err);
+    } finally {
+      setBusyId(null);
+      load();
+    }
+  }
+
+  /** 一覧の「検査ライン済み」ボタン（車検） */
+  async function kensa(e) {
+    setBusyId(e.key);
+    try {
+      const body = e.kind === 'booking'
+        ? { booking_id: e.booking.id, version: e.booking.version, kensa: true }
+        : { seibi_no: e.seibi.seibi_no, version: e.seibi.flags?.version || 0, kensa: true };
+      await api('/api/nyuko/flags', { method: 'POST', body });
+      showToast(`${e.customer || e.plate || '車両'}を検査ライン済みにしました`);
     } catch (err) {
       onApiError(err);
     } finally {
@@ -275,7 +292,7 @@ export default function NyukoBoard() {
                     <span className="cnt">{dayCount}台</span>
                   </div>
                 )}
-                <Entry e={e} today={today} showDate={tile !== 'schedule'} onArrive={arrive} busy={busyId === e.key} onOpen={() => setPanel(e.kind === 'booking' ? { mode: 'edit', id: e.booking.id } : { mode: 'walkin', seibiNo: e.seibi.seibi_no })} />
+                <Entry e={e} today={today} showDate={tile !== 'schedule'} onArrive={arrive} onKensa={kensa} busy={busyId === e.key} onOpen={() => setPanel(e.kind === 'booking' ? { mode: 'edit', id: e.booking.id } : { mode: 'walkin', seibiNo: e.seibi.seibi_no })} />
               </Fragment>
             );
           })}
@@ -298,7 +315,7 @@ export default function NyukoBoard() {
   );
 }
 
-function Entry({ e, today, showDate, onOpen, onArrive, busy }) {
+function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
   const dim = e.kind === 'booking' && e.booking.state !== 'booked';
   const canArrive = e.kind === 'booking' && e.booking.state === 'booked' && ['planned', 'today', 'missing'].includes(e.p.key) && e.date <= addDays(today, 1);
   return (
@@ -341,6 +358,10 @@ function Entry({ e, today, showDate, onOpen, onArrive, busy }) {
         {canArrive && (
           <button type="button" className="btn small primary" disabled={busy}
             onClick={(ev) => { ev.stopPropagation(); onArrive(e); }}>{busy ? '記録中…' : '入庫済み'}</button>
+        )}
+        {canKensa(e.workType, e.p) && e.p.key !== 'inspected' && (e.kind === 'walkin' || e.booking.state === 'booked') && (
+          <button type="button" className="btn small primary" disabled={busy}
+            onClick={(ev) => { ev.stopPropagation(); onKensa(e); }}>{busy ? '記録中…' : '検査ライン済み'}</button>
         )}
       </span>
     </div>

@@ -256,3 +256,4 @@ a.btn { text-decoration: none; display: inline-block; }
   .entry > .st { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
   .form-grid { grid-template-columns: 1fr; }
 }
+.prog.inspected { background: #e6eefb; color: #1f4f9a; }

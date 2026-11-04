@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { BOOKING_STATES, HOLD_REASONS, STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { jpDate, shortDate } from '@/lib/shared/dates';
-import { progress } from '@/lib/shared/nyuko';
+import { canHold, canKensa, normalizeWorkType, progress } from '@/lib/shared/nyuko';
 
 const EMPTY = {
   customer_name: '', customer_kana: '', phone: '', plate: '', maker: '', car_name: '', work_type: '一般整備', work_detail: '',
@@ -218,15 +218,14 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
                 onClick={() => booking.state !== s.id && patch({ state: s.id }, `「${s.label}」にしました`)}>{s.label}</button>
             ))}
           </div>
-          <div className="row">
-            <label className="label" htmlFor="hold">保留の理由</label>
-            <select id="hold" className="select" value={booking.hold_reason} disabled={busy}
-              onChange={(e) => patch({ hold_reason: e.target.value }, e.target.value ? `「${e.target.value}」にしました` : '保留を外しました')}>
-              <option value="">なし</option>
-              {HOLD_REASONS.map((h) => <option key={h}>{h}</option>)}
-            </select>
-          </div>
         </section>
+      )}
+      {booking && booking.state === 'booked' && (
+        <WorkStatus
+          target={{ booking_id: booking.id }} version={booking.version} workType={booking.work_type}
+          seibi={booking.seibi} p={p} hold={booking.hold_reason} kensaAt={booking.kensa_at} kensaBy={booking.kensa_by_name}
+          next={{ mode: 'edit', id: booking.id }} onSaved={onSaved} onApiError={onApiError}
+        />
       )}
 
       <section className="sec">
@@ -386,9 +385,67 @@ function SlipCard({ seibi: s, children }) {
   );
 }
 
+// ------------------------------------------------------------------
+// 作業の状況：部品待ち・保留（見積後）／検査ライン済み（車検）
+// ------------------------------------------------------------------
+function WorkStatus({ target, version, workType, seibi, p, hold, kensaAt, kensaBy, next, onSaved, onApiError }) {
+  const [busy, setBusy] = useState(false);
+  const holdOk = canHold(seibi, p);
+  const kensaOk = canKensa(workType, p);
+  if (!holdOk && !kensaOk && !hold && !kensaAt) {
+    return (
+      <section className="sec">
+        <h3>作業の状況</h3>
+        <p className="xs muted" style={{ margin: 0 }}>
+          部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。作ったばかりなら一覧の「今すぐ更新」を押してください。
+        </p>
+      </section>
+    );
+  }
+
+  async function send(change, msg) {
+    setBusy(true);
+    try {
+      await api('/api/nyuko/flags', { method: 'POST', body: { ...target, version, ...change } });
+      onSaved(msg, next);
+    } catch (e) {
+      onApiError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="sec">
+      <h3>作業の状況</h3>
+      <div className="seg" aria-label="部品待ち・保留">
+        {[['', 'なし'], ...HOLD_REASONS.map((h) => [h, h])].map(([v, label]) => (
+          <button key={label} type="button" aria-pressed={hold === v} disabled={busy || (!holdOk && v !== '')}
+            onClick={() => hold !== v && send({ hold_reason: v }, v ? `「${v}」にしました` : '部品待ち・保留を外しました')}>{label}</button>
+        ))}
+      </div>
+      {!holdOk && <p className="xs muted" style={{ margin: 0 }}>部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。</p>}
+      {workType === '車検' && (kensaOk || kensaAt) && (
+        kensaAt ? (
+          <div className="row">
+            <span className="prog inspected">検査ライン済み</span>
+            <span className="small">{fmtTime(kensaAt)}（{kensaBy}）</span>
+            <button type="button" className="btn small" disabled={busy} onClick={() => send({ kensa: false }, '検査ライン済みを取り消しました')}>取り消す</button>
+          </div>
+        ) : (
+          <div className="row">
+            <button type="button" className="btn primary" disabled={busy} onClick={() => send({ kensa: true }, '検査ライン済みにしました')}>検査ライン済み</button>
+            <span className="xs muted">車検の検査ラインを通したら押してください</span>
+          </div>
+        )
+      )}
+    </section>
+  );
+}
+
 function WalkIn({ seibi, data, onSaved, onApiError }) {
   const [busy, setBusy] = useState(false);
-  const p = progress(null, seibi, data.today);
+  const p = progress(null, seibi, data.today, seibi.flags);
   const bookings = data.items.filter((b) => b.state === 'booked' && !b.seibi_no && (!b.car_no || b.car_no === seibi.car_no));
 
   async function linkTo(id) {
@@ -416,6 +473,11 @@ function WalkIn({ seibi, data, onSaved, onApiError }) {
         <SlipCard seibi={seibi} />
         <p className="xs muted" style={{ margin: 0 }}>この伝票はジョーカーの内容をそのまま表示しています。変更はジョーカーで行ってください。</p>
       </section>
+      <WorkStatus
+        target={{ seibi_no: seibi.seibi_no }} version={seibi.flags?.version || 0} workType={normalizeWorkType(seibi.work_type)}
+        seibi={seibi} p={p} hold={seibi.flags?.hold_reason || ''} kensaAt={seibi.flags?.kensa_at} kensaBy={seibi.flags?.kensa_by_name}
+        next={{ mode: 'walkin', seibiNo: seibi.seibi_no }} onSaved={onSaved} onApiError={onApiError}
+      />
       {bookings.length > 0 && (
         <section className="sec">
           <h3>予約と結び付ける</h3>
