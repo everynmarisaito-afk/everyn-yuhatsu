@@ -5,14 +5,14 @@ import { useSession } from './AppShell';
 import BookingPanel from './BookingPanel';
 import { STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { addDays, jpDate, shortDate } from '@/lib/shared/dates';
-import { canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
+import { canDone, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 const dow = (iso) => WEEK[new Date(`${iso}T00:00:00Z`).getUTCDay()];
 const hm = (v) => (/^\d{4}$/.test(v || '') ? `${v.slice(0, 2)}:${v.slice(2)}` : v || '');
 
 const TILES = [
-  { id: 'schedule', label: '入庫予定（2週間）', dot: 'navy' },
+  { id: 'schedule', label: '入庫予定（予約済み）', dot: 'navy' },
   { id: 'today', label: '本日の入庫', dot: 'navy' },
   { id: 'inshop', label: '入庫中', dot: 'warn' },
   { id: 'overdue', label: '納車予定超過', dot: 'late' },
@@ -118,10 +118,10 @@ export default function NyukoBoard() {
 
   const views = useMemo(() => {
     if (!today) return {};
-    const end = addDays(today, 13);
     const booked = (e) => e.kind === 'booking' && e.booking.state === 'booked';
     return {
-      schedule: filtered.filter((e) => e.kind === 'booking' && e.date >= today && e.date <= end)
+      // 予約済みでまだ入庫していないもの全部（今日以降）。日ごとに並べる
+      schedule: filtered.filter((e) => booked(e) && e.date >= today && ['planned', 'today'].includes(e.p.key))
         .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99')),
       today: filtered.filter((e) => e.date === today && (e.kind === 'walkin' || e.booking.state !== 'cancelled'))
         .sort((a, b) => (a.time || '99').localeCompare(b.time || '99')),
@@ -159,15 +159,15 @@ export default function NyukoBoard() {
     }
   }
 
-  /** 一覧の「検査ライン済み」ボタン（車検） */
-  async function kensa(e) {
+  /** 一覧の「検査ライン済み」（車検）・「作業済み」ボタン */
+  async function kensa(e, kind = 'kensa') {
     setBusyId(e.key);
     try {
-      const body = e.kind === 'booking'
-        ? { booking_id: e.booking.id, version: e.booking.version, kensa: true }
-        : { seibi_no: e.seibi.seibi_no, version: e.seibi.flags?.version || 0, kensa: true };
-      await api('/api/nyuko/flags', { method: 'POST', body });
-      showToast(`${e.customer || e.plate || '車両'}を検査ライン済みにしました`);
+      const base = e.kind === 'booking'
+        ? { booking_id: e.booking.id, version: e.booking.version }
+        : { seibi_no: e.seibi.seibi_no, version: e.seibi.flags?.version || 0 };
+      await api('/api/nyuko/flags', { method: 'POST', body: { ...base, [kind]: true } });
+      showToast(`${e.customer || e.plate || '車両'}を${kind === 'done' ? '作業済み' : '検査ライン済み'}にしました`);
     } catch (err) {
       onApiError(err);
     } finally {
@@ -284,7 +284,7 @@ export default function NyukoBoard() {
         </div>
       ) : (
         <div className="list">
-          {list.length === 0 && <div className="empty">{tile === 'schedule' ? 'この2週間の入庫予約はありません。' : '該当する車両はありません。'}</div>}
+          {list.length === 0 && <div className="empty">{tile === 'schedule' ? '予約済みの入庫はありません。' : '該当する車両はありません。'}</div>}
           {list.map((e, i) => {
             const showHead = tile === 'schedule' && (i === 0 || list[i - 1].date !== e.date);
             const dayCount = showHead ? list.filter((x) => x.date === e.date).length : 0;
@@ -363,9 +363,13 @@ function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
           <button type="button" className="btn small primary" disabled={busy}
             onClick={(ev) => { ev.stopPropagation(); onArrive(e); }}>{busy ? '記録中…' : '入庫済み'}</button>
         )}
-        {canKensa(e.workType, e.p) && e.p.key !== 'inspected' && (e.kind === 'walkin' || e.booking.state === 'booked') && (
+        {canKensa(e.workType, e.p) && e.p.key !== 'inspected' && !(e.booking?.kensa_at || e.seibi?.flags?.kensa_at) && (e.kind === 'walkin' || e.booking.state === 'booked') && (
           <button type="button" className="btn small primary" disabled={busy}
-            onClick={(ev) => { ev.stopPropagation(); onKensa(e); }}>{busy ? '記録中…' : '検査ライン済み'}</button>
+            onClick={(ev) => { ev.stopPropagation(); onKensa(e, 'kensa'); }}>{busy ? '記録中…' : '検査ライン済み'}</button>
+        )}
+        {canDone(e.p) && (e.kind === 'walkin' || e.booking.state === 'booked') && (
+          <button type="button" className="btn small" disabled={busy}
+            onClick={(ev) => { ev.stopPropagation(); onKensa(e, 'done'); }}>{busy ? '記録中…' : '作業済み'}</button>
         )}
       </span>
     </div>

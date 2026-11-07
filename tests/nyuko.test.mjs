@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canHold, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
+import { canDone, canHold, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
 import { mapJocarSeibi, mapVehicleHit } from '../lib/server/jocar-map.js';
 import { sampleNyuko } from '../lib/server/sample.js';
 
@@ -122,4 +122,22 @@ test('入庫未定（見積のみ）', () => {
   assert.equal(canKensa('車検', p), false);
   // 売上決定になれば売上確定が優先
   assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { hold_reason: '入庫未定' }).key, 'delivered');
+});
+
+test('作業済み', () => {
+  const T2 = '2026-11-07';
+  const slip = { nko_day: T2, gm_status: '0' };
+  assert.equal(canDone(progress(null, slip, T2)), true);
+  const p = progress(null, slip, T2, { work_done_at: '2026-11-07T05:00:00Z' });
+  assert.equal(p.label, '作業済み');
+  assert.equal(canDone(p), false);
+  assert.equal(isInShop(p), true); // 納車（売上決定）まで入庫中に残る
+  // 予約：入庫済み→作業済み。入庫前は押せない
+  assert.equal(canDone(progress({ planned_date: T2, state: 'booked' }, null, T2)), false);
+  assert.equal(progress({ planned_date: T2, state: 'booked', arrived_at: 'a', work_done_at: '2026-11-07T06:00:00Z' }, null, T2).label, '作業済み');
+  // 検査ライン済みと両方なら後から押した方
+  assert.equal(progress(null, slip, T2, { work_done_at: '2026-11-07T05:00:00Z', kensa_at: '2026-11-07T06:00:00Z' }).label, '検査ライン済み');
+  assert.equal(progress(null, slip, T2, { work_done_at: '2026-11-07T07:00:00Z', kensa_at: '2026-11-07T06:00:00Z' }).label, '作業済み');
+  // 売上決定が最優先
+  assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { work_done_at: 'x' }).label, '売上確定');
 });

@@ -2,7 +2,7 @@ import { requireStaff } from '@/lib/server/auth';
 import { handle, HttpError, json, readJson } from '@/lib/server/http';
 import { setWorkFlags } from '@/lib/server/nyuko';
 
-// 作業の状況：部品待ち・保留（見積後）、検査ライン済み（車検）
+// 作業の状況：部品待ち・保留・入庫未定（見積後）、検査ライン済み（車検）、作業済み
 // body: { booking_id | seibi_no, version, hold_reason? , kensa? }
 export const POST = handle(async (req) => {
   const staff = await requireStaff(req, { write: true });
@@ -13,5 +13,6 @@ export const POST = handle(async (req) => {
   const change = {};
   if (typeof body?.hold_reason === 'string') change.hold_reason = body.hold_reason;
   if (typeof body?.kensa === 'boolean') change.kensa = body.kensa;
+  if (typeof body?.done === 'boolean') change.done = body.done;
   return json({ saved: await setWorkFlags(target, change, version, staff) });
 });
