@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canDone, canHold, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
+import { canDone, canHold, canKensa, canReturn, isDeliveryOverdue, isInShop, normalizeWorkType, pickSeibiFor, progress } from '../lib/shared/nyuko.js';
 import { mapJocarSeibi, mapVehicleHit } from '../lib/server/jocar-map.js';
 import { sampleNyuko } from '../lib/server/sample.js';
 
@@ -140,4 +140,18 @@ test('作業済み', () => {
   assert.equal(progress(null, slip, T2, { work_done_at: '2026-11-07T07:00:00Z', kensa_at: '2026-11-07T06:00:00Z' }).label, '作業済み');
   // 売上決定が最優先
   assert.equal(progress(null, { ...slip, gm_status: '1' }, T2, { work_done_at: 'x' }).label, '売上確定');
+});
+
+test('返却済み', () => {
+  const T2 = '2026-11-07';
+  const slip = { nko_day: T2, gm_status: '0' };
+  const done = progress(null, slip, T2, { work_done_at: 'a' });
+  assert.equal(canReturn(done), true);
+  const ret = progress(null, slip, T2, { work_done_at: 'a', returned_at: 'b' });
+  assert.equal(ret.label, '返却済み');
+  assert.equal(isInShop(ret), false);
+  assert.equal(canReturn(ret), false);
+  // 予約側も同じ。入庫前は押せない
+  assert.equal(canReturn(progress({ planned_date: T2, state: 'booked' }, null, T2)), false);
+  assert.equal(progress({ planned_date: T2, state: 'booked', arrived_at: 'a', returned_at: 'b' }, null, T2).label, '返却済み');
 });

@@ -5,7 +5,7 @@ import { useSession } from './AppShell';
 import BookingPanel from './BookingPanel';
 import { STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { addDays, jpDate, shortDate } from '@/lib/shared/dates';
-import { canDone, canKensa, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
+import { canDone, canKensa, canReturn, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 const dow = (iso) => WEEK[new Date(`${iso}T00:00:00Z`).getUTCDay()];
@@ -40,7 +40,7 @@ function toEntries(data) {
       store: b.store, loaner: b.loaner || Boolean(b.seibi?.loaner_out_day),
       workStaff: b.seibi?.work_staff || b.work_staff, salesStaff: b.seibi?.sales_staff || b.sales_staff,
       deliveryDue: b.seibi?.nsh_y_day || b.return_planned_date, hold: b.hold_reason,
-      overdue: isDeliveryOverdue(b, b.seibi, today),
+      overdue: p.key !== 'delivered' && isDeliveryOverdue(b, b.seibi, today),
     };
   });
   const walkIns = data.walkIns.map((s) => {
@@ -51,7 +51,7 @@ function toEntries(data) {
       plate: s.plate, maker: s.maker, car: s.car_name, customer: s.customer_name,
       workType: normalizeWorkType(s.work_type), detail: s.work_sub, store: '', loaner: Boolean(s.loaner_out_day),
       workStaff: s.work_staff, salesStaff: s.sales_staff, deliveryDue: s.nsh_y_day, hold: s.flags?.hold_reason || '',
-      overdue: isDeliveryOverdue(null, s, today),
+      overdue: p.key !== 'delivered' && isDeliveryOverdue(null, s, today),
     };
   });
   return [...fromBookings, ...walkIns];
@@ -167,7 +167,8 @@ export default function NyukoBoard() {
         ? { booking_id: e.booking.id, version: e.booking.version }
         : { seibi_no: e.seibi.seibi_no, version: e.seibi.flags?.version || 0 };
       await api('/api/nyuko/flags', { method: 'POST', body: { ...base, [kind]: true } });
-      showToast(`${e.customer || e.plate || '車両'}を${kind === 'done' ? '作業済み' : '検査ライン済み'}にしました`);
+      const label = { done: '作業済み', kensa: '検査ライン済み', returned: '返却済み' }[kind];
+      showToast(`${e.customer || e.plate || '車両'}を${label}にしました`);
     } catch (err) {
       onApiError(err);
     } finally {
@@ -370,6 +371,10 @@ function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
         {canDone(e.p) && (e.kind === 'walkin' || e.booking.state === 'booked') && (
           <button type="button" className="btn small" disabled={busy}
             onClick={(ev) => { ev.stopPropagation(); onKensa(e, 'done'); }}>{busy ? '記録中…' : '作業済み'}</button>
+        )}
+        {canReturn(e.p) && ['finished', 'inspected'].includes(e.p.key) && (e.kind === 'walkin' || e.booking.state === 'booked') && (
+          <button type="button" className="btn small primary" disabled={busy}
+            onClick={(ev) => { ev.stopPropagation(); onKensa(e, 'returned'); }}>{busy ? '記録中…' : '返却済み'}</button>
         )}
       </span>
     </div>
