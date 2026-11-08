@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import MemberFlag from './MemberFlag';
 import { BOOKING_STATES, HOLD_REASONS, STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { jpDate, shortDate } from '@/lib/shared/dates';
 import { canDone, canHold, canKensa, canReturn, normalizeWorkType, progress } from '@/lib/shared/nyuko';
@@ -168,7 +169,7 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
       {booking && (
         <section className="sec">
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <span className={`prog ${p.key}`}>{p.label}</span>
+            <span className="row" style={{ gap: 6 }}><span className={`prog ${p.key}`}>{p.label}</span><MemberFlag m={booking.member} long /></span>
             <span className="xs muted">
               {booking.source === 'yuhatsu' ? '誘発ボードから' : booking.source === 'member_app' ? '会員アプリから' : '手入力'}
               ・登録 {booking.created_by_name}{booking.updated_by_name && booking.updated_by_name !== booking.created_by_name ? `・最終更新 ${booking.updated_by_name}` : ''}
@@ -500,7 +501,7 @@ function WalkIn({ seibi, data, onSaved, onApiError }) {
   return (
     <>
       <section className="sec">
-        <span className={`prog ${p.key}`} style={{ justifySelf: 'start' }}>{p.label}</span>
+        <span className="row" style={{ gap: 6 }}><span className={`prog ${p.key}`}>{p.label}</span><MemberFlag m={seibi.member} long /></span>
         <div>
           <div style={{ fontWeight: 700 }}>{seibi.maker} {seibi.car_name} <span className="plate-text">{seibi.plate}</span></div>
           <div className="sub">{seibi.customer_name ? `${seibi.customer_name} 様` : ''}{seibi.phone ? ` ・ ${seibi.phone}` : ''}</div>

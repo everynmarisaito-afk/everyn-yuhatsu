@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './api';
 import { useSession } from './AppShell';
 import BookingPanel from './BookingPanel';
+import MemberFlag from './MemberFlag';
 import { STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { addDays, jpDate, shortDate } from '@/lib/shared/dates';
 import { canDone, canKensa, canReturn, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
@@ -41,6 +42,7 @@ function toEntries(data) {
       workStaff: b.seibi?.work_staff || b.work_staff, salesStaff: b.seibi?.sales_staff || b.sales_staff,
       deliveryDue: b.seibi?.nsh_y_day || b.return_planned_date, hold: b.hold_reason,
       overdue: p.key !== 'delivered' && isDeliveryOverdue(b, b.seibi, today),
+      member: b.member || null,
     };
   });
   const walkIns = data.walkIns.map((s) => {
@@ -52,6 +54,7 @@ function toEntries(data) {
       workType: normalizeWorkType(s.work_type), detail: s.work_sub, store: '', loaner: Boolean(s.loaner_out_day),
       workStaff: s.work_staff, salesStaff: s.sales_staff, deliveryDue: s.nsh_y_day, hold: s.flags?.hold_reason || '',
       overdue: p.key !== 'delivered' && isDeliveryOverdue(null, s, today),
+      member: s.member || null,
     };
   });
   return [...fromBookings, ...walkIns];
@@ -69,6 +72,7 @@ export default function NyukoBoard() {
   const [panel, setPanel] = useState(null); // {mode:'new', prefill} | {mode:'edit', id} | {mode:'walkin', seibiNo}
   const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [memberTab, setMemberTab] = useState('all'); // 入庫中：すべて／加入済み／未加入
   const [toast, setToast] = useState('');
 
   const showToast = useCallback((msg) => {
@@ -197,7 +201,12 @@ export default function NyukoBoard() {
   }
 
   const counts = { ...Object.fromEntries(Object.entries(views).map(([k, v]) => [k, v.length])), member: memberApp.length };
-  const list = tile === 'member' ? null : views[tile] || [];
+  const baseList = tile === 'member' ? null : views[tile] || [];
+  const isMember = (e) => e.member?.state === 'member';
+  const memberCounts = baseList ? { all: baseList.length, member: baseList.filter(isMember).length, none: baseList.filter((e) => !isMember(e)).length } : null;
+  const list = tile === 'inshop' && memberTab !== 'all'
+    ? baseList.filter((e) => (memberTab === 'member' ? isMember(e) : !isMember(e)))
+    : baseList;
   const run = data.lastSync;
 
   return (
@@ -231,6 +240,16 @@ export default function NyukoBoard() {
           </button>
         ))}
       </div>
+
+      {tile === 'inshop' && memberCounts && (
+        <div className="seg" role="tablist" aria-label="メンバーサービス">
+          {[['all', 'すべて'], ['member', 'メンバー加入済み'], ['none', '未加入']].map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={memberTab === id} aria-pressed={memberTab === id} onClick={() => setMemberTab(id)}>
+              {label}（{memberCounts[id]}）
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="filters">
         <input className="input" type="search" placeholder="お客様名・ナンバー・車名・電話で検索" aria-label="検索" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -350,6 +369,7 @@ function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
           {e.loaner && <span className="flag loaner">代車</span>}
           {e.hold && e.p.key !== 'undecided' && <span className="flag hold">{e.hold}</span>}
           {e.kind === 'walkin' && <span className="flag walkin">予約なし入庫</span>}
+          <MemberFlag m={e.member} />
           {e.kind === 'booking' && e.booking.source === 'yuhatsu' && <span className="flag walkin">誘発から</span>}
           {e.kind === 'booking' && e.booking.source === 'member_app' && <span className="flag walkin">会員アプリ</span>}
         </div>
@@ -380,3 +400,4 @@ function Entry({ e, today, showDate, onOpen, onArrive, onKensa, busy }) {
     </div>
   );
 }
+
