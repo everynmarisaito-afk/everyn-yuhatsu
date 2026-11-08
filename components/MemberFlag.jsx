@@ -2,7 +2,7 @@
 export default function MemberFlag({ m, long = false }) {
   if (!m) return null;
   if (m.state === 'member') {
-    const note = m.expired ? '・期限切れ' : m.unpaid ? '・未入金' : '';
+    const note = m.unpaid ? '・未払い' : m.expired ? '・期限切れ' : '';
     return (
       <span className={`flag ${note ? 'hold' : 'member'}`} title={m.number ? `会員番号 ${m.number}` : undefined}>
         メンバー{m.rank ? ` ${m.rank}` : ''}{note}{m.manual ? '（手動）' : ''}{long && m.number ? `（会員番号 ${m.number}${m.expiry ? `・${m.expiry.replaceAll('-', '/')}まで` : ''}）` : ''}

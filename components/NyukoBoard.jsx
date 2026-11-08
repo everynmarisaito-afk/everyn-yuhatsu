@@ -4,6 +4,7 @@ import { api } from './api';
 import { useSession } from './AppShell';
 import BookingPanel from './BookingPanel';
 import MemberFlag from './MemberFlag';
+import { memberCategory } from '@/lib/shared/match';
 import { STORES, WORK_TYPES } from '@/lib/shared/constants';
 import { addDays, jpDate, shortDate } from '@/lib/shared/dates';
 import { canDone, canKensa, canReturn, isDeliveryOverdue, isInShop, normalizeWorkType, progress, seibiArrival } from '@/lib/shared/nyuko';
@@ -202,10 +203,14 @@ export default function NyukoBoard() {
 
   const counts = { ...Object.fromEntries(Object.entries(views).map(([k, v]) => [k, v.length])), member: memberApp.length };
   const baseList = tile === 'member' ? null : views[tile] || [];
-  const isMember = (e) => e.member?.state === 'member';
-  const memberCounts = baseList ? { all: baseList.length, member: baseList.filter(isMember).length, none: baseList.filter((e) => !isMember(e)).length } : null;
+  const memberCounts = baseList ? {
+    all: baseList.length,
+    member: baseList.filter((e) => memberCategory(e.member) === 'member').length,
+    unpaid: baseList.filter((e) => memberCategory(e.member) === 'unpaid').length,
+    none: baseList.filter((e) => memberCategory(e.member) === 'none').length,
+  } : null;
   const list = tile === 'inshop' && memberTab !== 'all'
-    ? baseList.filter((e) => (memberTab === 'member' ? isMember(e) : !isMember(e)))
+    ? baseList.filter((e) => memberCategory(e.member) === memberTab)
     : baseList;
   const run = data.lastSync;
 
@@ -243,7 +248,7 @@ export default function NyukoBoard() {
 
       {tile === 'inshop' && memberCounts && (
         <div className="seg" role="tablist" aria-label="メンバーサービス">
-          {[['all', 'すべて'], ['member', 'メンバー加入済み'], ['none', '未加入']].map(([id, label]) => (
+          {[['all', 'すべて'], ['member', 'メンバー加入済み'], ['unpaid', '未払い'], ['none', '未加入']].map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={memberTab === id} aria-pressed={memberTab === id} onClick={() => setMemberTab(id)}>
               {label}（{memberCounts[id]}）
             </button>

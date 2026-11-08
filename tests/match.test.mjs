@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMemberIndex, memberStatus, phoneKey, plateKey, vinKey } from '../lib/shared/match.js';
+import { buildMemberIndex, memberCategory, memberStatus, phoneKey, plateKey, vinKey } from '../lib/shared/match.js';
 
 test('キーのならし', () => {
   assert.equal(vinKey('ＷＢＡ８Ｅ１２０－１Ｋ０'), 'WBA8E1201K0'); // 全角（ジョーカー）→半角
@@ -26,4 +26,11 @@ test('メンバーサービスの判定', () => {
   assert.equal(memberStatus(ix, { vin: 'XXXX99999', plate: '堺 300 か 1111', phone: '09000000101' }, T).state, 'other_car');
   // どれも合わない
   assert.equal(memberStatus(ix, { vin: '', plate: '', phone: '' }, T).state, 'none');
+});
+
+test('タブ分け', () => {
+  assert.equal(memberCategory({ state: 'member' }), 'member');
+  assert.equal(memberCategory({ state: 'member', unpaid: true }), 'unpaid');
+  assert.equal(memberCategory({ state: 'other_car' }), 'none');
+  assert.equal(memberCategory(null), 'none');
 });

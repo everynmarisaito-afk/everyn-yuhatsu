@@ -492,7 +492,7 @@ function MemberSetting({ target, version, m, override, next, onSaved, onApiError
     setBusy(true);
     try {
       await api('/api/nyuko/flags', { method: 'POST', body: { ...target, version, member: v } });
-      onSaved(v === 'member' ? 'メンバー加入済みにしました' : v === 'none' ? '未加入にしました' : '自動判定に戻しました', next);
+      onSaved({ member: 'メンバー加入済みにしました', unpaid: '未払いにしました', none: '未加入にしました' }[v] || '自動判定に戻しました', next);
     } catch (e) {
       onApiError(e);
     } finally {
@@ -504,12 +504,12 @@ function MemberSetting({ target, version, m, override, next, onSaved, onApiError
       <h3>メンバーサービス</h3>
       <div className="row"><MemberFlag m={m} long /></div>
       <div className="seg" aria-label="メンバーサービスの指定">
-        {[['', '自動判定'], ['member', '加入済み'], ['none', '未加入']].map(([v, label]) => (
+        {[['', '自動判定'], ['member', '加入済み'], ['unpaid', '未払い'], ['none', '未加入']].map(([v, label]) => (
           <button key={label} type="button" aria-pressed={(override || '') === v} disabled={busy} onClick={() => (override || '') !== v && send(v)}>{label}</button>
         ))}
       </div>
       <p className="xs muted" style={{ margin: 0 }}>
-        自動判定は、会員システムの車台番号・ナンバーと照合しています。合っていないときは「加入済み」「未加入」で手動で指定してください。
+        自動判定は、会員システムの車台番号・ナンバーと照合しています。合っていないときは「加入済み」「未払い」「未加入」で手動で指定してください。
       </p>
     </section>
   );
