@@ -15,5 +15,6 @@ export const POST = handle(async (req) => {
   if (typeof body?.kensa === 'boolean') change.kensa = body.kensa;
   if (typeof body?.done === 'boolean') change.done = body.done;
   if (typeof body?.returned === 'boolean') change.returned = body.returned;
+  if (typeof body?.member === 'string') change.member = body.member;
   return json({ saved: await setWorkFlags(target, change, version, staff) });
 });

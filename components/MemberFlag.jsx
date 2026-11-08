@@ -5,10 +5,10 @@ export default function MemberFlag({ m, long = false }) {
     const note = m.expired ? '・期限切れ' : m.unpaid ? '・未入金' : '';
     return (
       <span className={`flag ${note ? 'hold' : 'member'}`} title={m.number ? `会員番号 ${m.number}` : undefined}>
-        メンバー{m.rank ? ` ${m.rank}` : ''}{note}{long && m.number ? `（会員番号 ${m.number}${m.expiry ? `・${m.expiry.replaceAll('-', '/')}まで` : ''}）` : ''}
+        メンバー{m.rank ? ` ${m.rank}` : ''}{note}{m.manual ? '（手動）' : ''}{long && m.number ? `（会員番号 ${m.number}${m.expiry ? `・${m.expiry.replaceAll('-', '/')}まで` : ''}）` : ''}
       </span>
     );
   }
   if (m.state === 'other_car') return <span className="flag nonmember">未加入（同じお客様の別の車で加入）</span>;
-  return <span className="flag nonmember">メンバーサービス未加入</span>;
+  return <span className="flag nonmember">メンバーサービス未加入{m.manual ? '（手動）' : ''}</span>;
 }

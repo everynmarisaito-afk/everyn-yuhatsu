@@ -222,6 +222,10 @@ function BookingForm({ booking, prefill, data, onSaved, onApiError, toast }) {
         </section>
       )}
       {booking && booking.state === 'booked' && (
+        <MemberSetting target={{ booking_id: booking.id }} version={booking.version} m={booking.member} override={booking.member_override}
+          next={{ mode: 'edit', id: booking.id }} onSaved={onSaved} onApiError={onApiError} />
+      )}
+      {booking && booking.state === 'booked' && (
         <WorkStatus
           target={{ booking_id: booking.id }} version={booking.version} workType={booking.work_type}
           seibi={booking.seibi} p={p} hold={booking.hold_reason} kensaAt={booking.kensa_at} kensaBy={booking.kensa_by_name}
@@ -479,6 +483,38 @@ function WorkStatus({ target, version, workType, seibi, p, hold, kensaAt, kensaB
   );
 }
 
+// ------------------------------------------------------------------
+// メンバーサービス：自動判定／手動で加入済み・未加入
+// ------------------------------------------------------------------
+function MemberSetting({ target, version, m, override, next, onSaved, onApiError }) {
+  const [busy, setBusy] = useState(false);
+  async function send(v) {
+    setBusy(true);
+    try {
+      await api('/api/nyuko/flags', { method: 'POST', body: { ...target, version, member: v } });
+      onSaved(v === 'member' ? 'メンバー加入済みにしました' : v === 'none' ? '未加入にしました' : '自動判定に戻しました', next);
+    } catch (e) {
+      onApiError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="sec">
+      <h3>メンバーサービス</h3>
+      <div className="row"><MemberFlag m={m} long /></div>
+      <div className="seg" aria-label="メンバーサービスの指定">
+        {[['', '自動判定'], ['member', '加入済み'], ['none', '未加入']].map(([v, label]) => (
+          <button key={label} type="button" aria-pressed={(override || '') === v} disabled={busy} onClick={() => (override || '') !== v && send(v)}>{label}</button>
+        ))}
+      </div>
+      <p className="xs muted" style={{ margin: 0 }}>
+        自動判定は、会員システムの車台番号・ナンバーと照合しています。合っていないときは「加入済み」「未加入」で手動で指定してください。
+      </p>
+    </section>
+  );
+}
+
 function WalkIn({ seibi, data, onSaved, onApiError }) {
   const [busy, setBusy] = useState(false);
   const p = progress(null, seibi, data.today, seibi.flags);
@@ -509,6 +545,8 @@ function WalkIn({ seibi, data, onSaved, onApiError }) {
         <SlipCard seibi={seibi} />
         <p className="xs muted" style={{ margin: 0 }}>この伝票はジョーカーの内容をそのまま表示しています。変更はジョーカーで行ってください。</p>
       </section>
+      <MemberSetting target={{ seibi_no: seibi.seibi_no }} version={seibi.flags?.version || 0} m={seibi.member} override={seibi.flags?.member_override || ''}
+        next={{ mode: 'walkin', seibiNo: seibi.seibi_no }} onSaved={onSaved} onApiError={onApiError} />
       <WorkStatus
         target={{ seibi_no: seibi.seibi_no }} version={seibi.flags?.version || 0} workType={normalizeWorkType(seibi.work_type)}
         seibi={seibi} p={p} hold={seibi.flags?.hold_reason || ''} kensaAt={seibi.flags?.kensa_at} kensaBy={seibi.flags?.kensa_by_name}
