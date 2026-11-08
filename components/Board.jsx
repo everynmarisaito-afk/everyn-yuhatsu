@@ -86,8 +86,9 @@ export default function Board() {
     return c;
   }, [items, today]);
 
-  const salesNames = useMemo(() => uniqueSorted(items.map((i) => i.sales_staff)), [items]);
-  const workNames = useMemo(() => uniqueSorted(items.map((i) => i.service_staff)), [items]);
+  // 担当の候補：ジョーカーに出てくる担当者全員（営業・作業を兼ねる人もいるため両方に同じ名簿）
+  const salesNames = useMemo(() => data?.staffNames || uniqueSorted(items.map((i) => i.sales_staff)), [data, items]);
+  const workNames = useMemo(() => data?.staffNames || uniqueSorted(items.map((i) => i.service_staff)), [data, items]);
 
   const rows = useMemo(() => {
     const kw = query.trim().toLowerCase().replace(/\s+/g, '');
