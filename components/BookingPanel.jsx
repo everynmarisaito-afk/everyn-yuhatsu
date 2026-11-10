@@ -406,7 +406,7 @@ function WorkStatus({ target, version, workType, seibi, p, hold, kensaAt, kensaB
       <section className="sec">
         <h3>作業の状況</h3>
         <p className="xs muted" style={{ margin: 0 }}>
-          部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。作ったばかりなら一覧の「今すぐ更新」を押してください。
+          見積返答待ち・部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。作ったばかりなら一覧の「今すぐ更新」を押してください。
         </p>
       </section>
     );
@@ -427,13 +427,13 @@ function WorkStatus({ target, version, workType, seibi, p, hold, kensaAt, kensaB
   return (
     <section className="sec">
       <h3>作業の状況</h3>
-      <div className="seg" aria-label="部品待ち・保留">
+      <div className="seg" aria-label="作業の状況">
         {[['', 'なし'], ...HOLD_REASONS.map((h) => [h, h])].map(([v, label]) => (
           <button key={label} type="button" aria-pressed={hold === v} disabled={busy || (!holdOk && v !== '')}
-            onClick={() => hold !== v && send({ hold_reason: v }, v ? `「${v}」にしました` : hold === '入庫未定' ? '入庫しました（作業待ち）' : '部品待ち・保留を外しました')}>{label}</button>
+            onClick={() => hold !== v && send({ hold_reason: v }, v ? `「${v}」にしました` : hold === '入庫未定' ? '入庫しました（作業待ち）' : '作業の状況を「なし」に戻しました')}>{label}</button>
         ))}
       </div>
-      {!holdOk && <p className="xs muted" style={{ margin: 0 }}>部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。</p>}
+      {!holdOk && <p className="xs muted" style={{ margin: 0 }}>見積返答待ち・部品待ち・保留は、ジョーカーで見積（伝票）を作ってから選べます。</p>}
       {hold === '入庫未定' && (
         <p className="xs muted" style={{ margin: 0 }}>見積だけ送って、まだ入庫していない状態です。「入庫中」には数えません。車が入ったら「なし」に戻すと作業待ちになります。</p>
       )}
