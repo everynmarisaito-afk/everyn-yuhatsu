@@ -263,3 +263,12 @@ a.btn { text-decoration: none; display: inline-block; }
 @media (max-width: 540px) { .summary.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .flag.member { background: var(--good-soft); color: var(--good); }
 .flag.nonmember { background: var(--surface); color: var(--muted); border: 1px dashed var(--line-strong); }
+
+/* アカウント（パスワード変更） */
+.account { max-width: 520px; display: grid; gap: 18px; }
+.account h1 { font-size: 20px; margin: 0; }
+.account .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 12px; }
+.account h2 { font-size: 16px; margin: 0; }
+.account .done { background: var(--good-soft, #e6f4ea); color: var(--good, #1e6b3a); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+.account .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.who a { color: inherit; }
